@@ -32,6 +32,16 @@ __status__ = "Production"
 __date__ = "Sep 23, 2011"
 
 
+def gram_schmidt(m):
+    gs = m.copy()
+    gs[1] -= proj(gs[0], gs[1]) * gs[0]
+    gs[2] -= proj(gs[0], gs[2]) * gs[0] + proj(gs[1], gs[2]) * gs[1]
+    return gs
+
+
+def proj(u1, v1):
+    return np.dot(v1, u1) / np.dot(u1, u1)
+
 
 class Lattice(MSONable):
     """
@@ -39,9 +49,6 @@ class Lattice(MSONable):
     general, it is assumed that length units are in Angstroms and angles are in
     degrees unless otherwise stated.
     """
-
-    # Properties lazily generated for efficiency.
-
 
     def __init__(self, matrix):
         """
@@ -204,9 +211,9 @@ class Lattice(MSONable):
         Convenience constructor for a monoclinic lattice.
 
         Args:
-            a (float): *a* lattice parameter of the monoclinc cell.
-            b (float): *b* lattice parameter of the monoclinc cell.
-            c (float): *c* lattice parameter of the monoclinc cell.
+            a (float): *a* lattice parameter of the monoclinic cell.
+            b (float): *b* lattice parameter of the monoclinic cell.
+            c (float): *c* lattice parameter of the monoclinic cell.
             beta (float): *beta* angle between lattice vectors b and c in
                 degrees.
 
@@ -593,6 +600,26 @@ class Lattice(MSONable):
                 other_lattice, ltol, atol,
                 skip_rotation_matrix=skip_rotation_matrix):
             return x
+
+    def get_lll_reduced_lattice_new(self, delta=0.75):
+        m = self._matrix.copy()
+
+        while True:
+            m_gs = gram_schmidt(m)
+
+            for i in range(1, 3):
+                for j in range(i - 1, -1, -1):
+                    m[i] -= round(proj(m_gs[j], m[i])) * m[j]
+
+            for i in range(2):
+                if delta * np.linalg.norm(m_gs[i]) ** 2 > \
+                        np.linalg.norm(proj(m_gs[i], m[i + 1]) * m_gs[i] +
+                                m_gs[i + 1]) ** 2:
+                    m[(i, i+1), :] = m[(i + 1, i), :]
+                    break
+            else:
+                break
+        return Lattice(m)
 
     def get_lll_reduced_lattice(self, delta=0.75):
         if delta not in self._lll_matrix_mappings:
