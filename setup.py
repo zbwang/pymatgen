@@ -111,7 +111,11 @@ setup(
                            extra_link_args=extra_link_args),
                  Extension("pymatgen.util.coord_utils_cython",
                            ["pymatgen/util/coord_utils_cython.c"],
-                           extra_link_args=extra_link_args)],
+                           extra_link_args=extra_link_args),
+                 Extension("pymatgen.cluster_expansion.ce_utils",
+                           ["pymatgen/cluster_expansion/ce_utils.c"],
+                           extra_link_args=extra_link_args)
+                 ],
     entry_points={
           'console_scripts': [
               'pmg = pymatgen.cli.pmg:main',
