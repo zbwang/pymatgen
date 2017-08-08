@@ -288,9 +288,12 @@ class CETest(unittest.TestCase):
                   (0, 0, 0),
                   (0.5, 0, 0))
         s = Structure(s.lattice, species, coords)
+        s.add_oxidation_state_by_element({'Br': -3, 'Ca': 2, 'Li': 1})
         self.structure.replace_species({'Br': {'Br': 0.9}})
-        ce = ClusterExpansion.from_radii(self.structure, {2: 4})
+        self.structure.add_oxidation_state_by_element({'Br': -3, 'Ca': 2, 'Li': 1})
+        ce = ClusterExpansion.from_radii(self.structure, {2: 4}, use_ewald=True)
 
         corr = ce.corr_from_structure(s)
-        result = np.array([1, 0.5, 0.25, 0, 0.5, 1, 0, 0.375, 0, 0.0625, 0.5, 0.25, 0.25, 0.125, 0, 0, 0.5])
+        result = np.array([1, 0.5, 0.25, 0, 0.5, 1, 0, 0.375, 0,
+                           0.0625, 0.5, 0.25, 0.25, 0.125, 0, 0, 0.5, -58.33396779])
         self.assertTrue(np.allclose(corr, result))
