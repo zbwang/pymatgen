@@ -276,3 +276,21 @@ class CETest(unittest.TestCase):
 
         self.assertRaisesRegexp(ValueError, 'symmetry operations',
                                 ClusterExpansion.from_radii, s, {2: 1})
+
+    def test_higher_dimensional_corr(self):
+        s = self.structure.copy()
+        s.make_supercell([2, 1, 1])
+        species = ('Li', 'Ca', 'Li', 'Ca', 'Br', 'Br')
+        coords = ((0.125, 0.25, 0.25),
+                  (0.625, 0.25, 0.25),
+                  (0.375, 0.75, 0.75),
+                  (0.25, 0.5, 0.5),
+                  (0, 0, 0),
+                  (0.5, 0, 0))
+        s = Structure(s.lattice, species, coords)
+        self.structure.replace_species({'Br': {'Br': 0.9}})
+        ce = ClusterExpansion.from_radii(self.structure, {2: 4})
+
+        corr = ce.corr_from_structure(s)
+        result = np.array([1, 0.5, 0.25, 0, 0.5, 1, 0, 0.375, 0, 0.0625, 0.5, 0.25, 0.25, 0.125, 0, 0, 0.5])
+        self.assertTrue(np.allclose(corr, result))
