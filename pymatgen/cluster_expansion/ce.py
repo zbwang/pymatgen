@@ -24,18 +24,20 @@ SYMMETRY_ERROR = ValueError("Error in calculating symmetry operations. Try using
 
 def get_bits(structure):
     """
-    Helper method to compute list of species on each site.
-    Includes vacancies
+    Helper method to compute list of species indexes for each site.
+    Includes vacancies. Also returns complete list of structure species.
     """
+    s_bits = sorted(structure.composition.keys()) + ['Vacancy']
     all_bits = []
     for site in structure:
         bits = []
         for sp in sorted(site.species_and_occu.keys()):
-            bits.append(str(sp))
+            bits.append(s_bits.index(sp))
         if site.species_and_occu.num_atoms < 0.99:
-            bits.append("Vacancy")
-        all_bits.append(bits)
-    return all_bits
+            bits.append(s_bits.index('Vacancy'))
+        all_bits.append(np.array(bits))
+    return all_bits, map(str, s_bits)
+
 
 
 class Cluster(MSONable):
@@ -346,16 +348,15 @@ class ClusterExpansion(object):
         Generates dictionary of size: [SymmetrizedCluster] given a dictionary of maximal cluster radii and symmetry
         operations to apply (not necessarily all the symmetries of the expansion_structure)
         """
-        bits = get_bits(expansion_structure)
-        nbits = np.array([len(b) - 1 for b in bits])
+        bits, s_bits = get_bits(expansion_structure)
         new_clusters = []
         clusters = {}
         for i, site in enumerate(expansion_structure):
             new_c = Cluster([site.frac_coords], expansion_structure.lattice)
-            new_sc = SymmetrizedCluster(new_c, [np.arange(nbits[i])], symops)
+            new_sc = SymmetrizedCluster(new_c, [bits[i][:-1]], symops)
             if new_sc not in new_clusters:
                 new_clusters.append(new_sc)
-        clusters[1] = sorted(new_clusters, key = lambda x: (np.round(x.max_radius,6), -x.multiplicity))
+        clusters[1] = sorted(new_clusters, key=lambda x: (np.round(x.max_radius,6), -x.multiplicity))
 
         all_neighbors = expansion_structure.lattice.get_points_in_sphere(expansion_structure.frac_coords, [0.5, 0.5, 0.5],
                                     max(radii.values()) + sum(expansion_structure.lattice.abc)/2)
@@ -372,7 +373,7 @@ class ClusterExpansion(object):
                     new_c = Cluster(np.concatenate([c.sites, [p]]), expansion_structure.lattice)
                     if new_c.max_radius > radius + 1e-8:
                         continue
-                    new_sc = SymmetrizedCluster(new_c, c.bits + [np.arange(nbits[n[2]])], symops)
+                    new_sc = SymmetrizedCluster(new_c, c.bits + [bits[n[2]][:-1]], symops)
                     if new_sc not in new_clusters:
                         new_clusters.append(new_sc)
             clusters[size] = sorted(new_clusters, key = lambda x: (np.round(x.max_radius,6), -x.multiplicity))
@@ -484,8 +485,7 @@ class ClusterSupercell(object):
         self.supercell.make_supercell(self.supercell_matrix)
         self.size = int(round(np.abs(np.linalg.det(self.supercell_matrix))))
 
-        self.bits = get_bits(self.supercell)
-        self.nbits = np.array([len(b)-1 for b in self.bits])
+        self.bits, self.s_bits = get_bits(self.supercell)
         self.fcoords = np.array(self.supercell.frac_coords)
 
         self._generate_mappings()
@@ -495,20 +495,19 @@ class ClusterSupercell(object):
             self.ewald_inds = []
             ewald_sites = []
             for bits, s in zip(self.bits, self.supercell):
-                inds = np.zeros(max(self.nbits) + 1) - 1
-                for i, b in enumerate(bits):
-                    if b == 'Vacancy':
-                        #inds.append(-1)
+                inds = np.zeros(len(self.s_bits)) - 1
+                for bit in bits:
+                    if bit == len(self.s_bits) - 1:
                         continue
-                    inds[i] = len(ewald_sites)
-                    ewald_sites.append(PeriodicSite(b, s.frac_coords, s.lattice))
+                    inds[bit] = len(ewald_sites)
+                    ewald_sites.append(PeriodicSite(self.s_bits[bit], s.frac_coords, s.lattice))
                 self.ewald_inds.append(inds)
             self.ewald_inds = np.array(self.ewald_inds, dtype=np.int)
             self._ewald_structure = Structure.from_sites(ewald_sites)
             self._ewald_matrix = None
             self._partial_ems = None
             self._all_ewalds = None
-            self._range = np.arange(len(self.nbits))
+            self._range = np.arange(len(self.bits))
         else:
             self._all_ewalds = np.zeros((0, 0, 0), dtype=np.float)
             self.ewald_inds = np.zeros((0, 0), dtype=np.int)
@@ -639,9 +638,9 @@ class ClusterSupercell(object):
 
     def structure_from_occu(self, occu):
         sites = []
-        for b, o, s in zip(self.bits, occu, self.supercell):
-            if b[o] != 'Vacancy':
-                sites.append(PeriodicSite(b[o], s.frac_coords, self.supercell.lattice))
+        for o, s in zip(occu, self.supercell):
+            if self.s_bits[o] != 'Vacancy':
+                sites.append(PeriodicSite(self.s_bits[o], s.frac_coords, self.supercell.lattice))
         return Structure.from_sites(sites)
 
     def corr_from_occupancy(self, occu):
@@ -682,7 +681,7 @@ class ClusterSupercell(object):
 
         #cs.supercell[mapping] = structure
         occu = np.zeros(len(self.supercell), dtype=np.int)
-        for i, bit in enumerate(self.bits):
+        for i in range(len(self.supercell)):
             #rather than starting with all vacancies and looping
             #only over mapping, explicitly loop over everything to
             #catch vacancies on improper sites
@@ -690,7 +689,7 @@ class ClusterSupercell(object):
                 sp = str(structure[mapping.index(i)].specie)
             else:
                 sp = 'Vacancy'
-            occu[i] = bit.index(sp)
+            occu[i] = self.s_bits.index(sp)
         if not return_mapping:
             return occu
         else:
