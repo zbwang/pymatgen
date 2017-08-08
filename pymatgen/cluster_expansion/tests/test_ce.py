@@ -7,6 +7,7 @@ from pymatgen.cluster_expansion.ce import Cluster,\
         ClusterExpansion, SITE_TOL
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from pymatgen.analysis.ewald import EwaldSummation
+from pymatgen.analysis.structure_matcher import StructureMatcher
 from pymatgen.util.coord_utils import is_coord_subset_pbc
 
 from monty.serialization import MontyDecoder, MontyEncoder
@@ -297,3 +298,28 @@ class CETest(unittest.TestCase):
         result = np.array([1, 0.5, 0.25, 0, 0.5, 1, 0, 0.375, 0,
                            0.0625, 0.5, 0.25, 0.25, 0.125, 0, 0, 0.5, -58.33396779])
         self.assertTrue(np.allclose(corr, result))
+
+    def test_structure_from_occu(self):
+        s = self.structure.copy()
+        s.make_supercell([2, 1, 1])
+        species = ('Li', 'Ca', 'Li', 'Ca', 'Br', 'Br')
+        coords = ((0.125, 0.25, 0.25),
+                  (0.625, 0.25, 0.25),
+                  (0.375, 0.75, 0.75),
+                  (0.25, 0.5, 0.5),
+                  (0, 0, 0),
+                  (0.5, 0, 0))
+        s = Structure(s.lattice, species, coords)
+        ce = ClusterExpansion.from_radii(self.structure, {2: 4}, use_ewald=False)
+        cs = ce.supercell_from_structure(s)
+        occu = cs.occu_from_structure(s)
+        s2 = cs.structure_from_occu(occu)
+
+        sm = StructureMatcher(primitive_cell=False,
+                              attempt_supercell=False,
+                              allow_subset=False,
+                              ltol=.1,
+                              stol=.1,
+                              angle_tol=5)
+
+        self.assertTrue(sm.fit(s2, s))
