@@ -1513,6 +1513,57 @@ def symmetry_reduced_voronoi_nodes(
         #return node_dist_sites, edgecenter_dist_sites, facecenter_dist_sites
 
 
+def get_okeeffe_params(el_symbol):
+    """
+    Returns the elemental parameters related to atom size and
+    electronegativity which are used for estimating bond-valence
+    parameters (bond length) of pairs of atoms on the basis of data
+    provided in 'Atoms Sizes and Bond Lengths in Molecules and Crystals'
+    (O'Keeffe & Brese, 1991).
+
+    Args:
+        el_symbol (str): element symbol.
+    Returns:
+        (dict): atom-size ('r') and electronegativity-related ('c')
+                parameter.
+    """
+
+    el = Element(el_symbol)
+    if el not in list(BV_PARAMS.keys()):
+        raise RuntimeError("Could not find O'Keeffe parameters for element"
+                           " \"{}\" in \"BV_PARAMS\"dictonary"
+                           " provided by pymatgen".format(el_symbol))
+
+    return BV_PARAMS[el]
+
+
+def get_okeeffe_distance_prediction(el1, el2):
+    """
+    Returns an estimate of the bond valence parameter (bond length) using
+    the derived parameters from 'Atoms Sizes and Bond Lengths in Molecules
+    and Crystals' (O'Keeffe & Brese, 1991). The estimate is based on two
+    experimental parameters: r and c. The value for r  is based off radius,
+    while c is (usually) the Allred-Rochow electronegativity. Values used
+    are *not* generated from pymatgen, and are found in
+    'okeeffe_params.json'.
+
+    Args:
+        el1, el2 (Element): two Element objects
+    Returns:
+        a float value of the predicted bond length
+    """
+    el1_okeeffe_params = get_okeeffe_params(el1)
+    el2_okeeffe_params = get_okeeffe_params(el2)
+
+    r1 = el1_okeeffe_params['r']
+    r2 = el2_okeeffe_params['r']
+    c1 = el1_okeeffe_params['c']
+    c2 = el2_okeeffe_params['c']
+
+    return r1 + r2 - r1 * r2 * math.pow(
+            math.sqrt(c1) - math.sqrt(c2), 2) / (c1 * r1 + c2 * r2)
+
+
 def get_neighbors_of_site_with_index(struct, n, p=None):
     """
     Determine the neighbors around the site that has index n in the input
@@ -1609,6 +1660,70 @@ def get_neighbors_of_site_with_index(struct, n, p=None):
     return sites
 
 
+def site_is_of_motif_type(struct, n, pneighs=None, thresh=None):
+    """
+    Returns the motif type of the site with index n in structure struct;
+    currently featuring "tetrahedral", "octahedral", "bcc", and "cp"
+    (close-packed: fcc and hcp) as well as "square pyramidal" and
+    "trigonal bipyramidal".  If the site is not recognized,
+    "unrecognized" is returned.  If a site should be assigned to two
+    different motifs, "multiple assignments" is returned.
+
+    Args:
+        struct (Structure): input structure.
+        n (int): index of site in Structure object for which motif type
+                is to be determined.
+        pneighs (dict): specification and parameters of neighbor-finding
+                approach (cf., function get_neighbors_of_site_with_index).
+        thresh (dict): thresholds for motif criteria (currently, required
+                keys and their default values are "qtet": 0.5,
+                "qoct": 0.5, "qbcc": 0.5, "q6": 0.4).
+
+    Returns: motif type (str).
+    """
+
+    if thresh is None:
+        thresh = {
+            "qtet": 0.5, "qoct": 0.5, "qbcc": 0.5, "q6": 0.4,
+            "qtribipyr": 0.8, "qsqpyr": 0.8}
+
+    ops = OrderParameters([
+            "cn", "tet", "oct", "bcc", "q6", "sq_pyr", "tri_bipyr"])
+            # 0    1      2      3       4     5        6
+    neighs_cent = get_neighbors_of_site_with_index(struct, n, p=pneighs)
+    neighs_cent.append(struct.sites[n])
+    opvals = ops.get_order_parameters(
+            neighs_cent, len(neighs_cent)-1, indeces_neighs=[
+            i for i in range(len(neighs_cent)-1)])
+    cn = int(opvals[0] + 0.5)
+    motif_type = "unrecognized"
+    nmotif = 0
+
+    if cn == 4 and opvals[1] > thresh["qtet"]:
+        motif_type = "tetrahedral"
+        nmotif += 1
+    if cn == 5 and opvals[5] > thresh["qsqpyr"]:
+       motif_type = "square pyramidal"
+       nmotif += 1
+    if cn == 5 and opvals[6] > thresh["qtribipyr"]:
+       motif_type = "trigonal bipyramidal"
+       nmotif += 1
+    if cn == 6 and opvals[2] > thresh["qoct"]:
+        motif_type = "octahedral"
+        nmotif += 1
+    if cn == 8 and (opvals[3] > thresh["qbcc"] and opvals[1] < thresh["qtet"]):
+        motif_type = "bcc"
+        nmotif += 1
+    if cn == 12 and (opvals[4] > thresh["q6"] and opvals[1] < thresh["q6"] and \
+                                 opvals[2] < thresh["q6"] and opvals[3] < thresh["q6"]):
+        motif_type = "cp"
+        nmotif += 1
+
+    if nmotif > 1:
+        motif_type = "multiple assignments"
+
+    return motif_type
+
 
 class StructureMotifInterstitial(Defect):
 
@@ -1623,10 +1738,10 @@ class StructureMotifInterstitial(Defect):
     (PyCDT, https://arxiv.org/abs/1611.07481).
     """
 
-    __supported_types = ("tetalt", "octalt", "bcc")
+    __supported_types = ("tet", "oct", "bcc")
 
     def __init__(self, struct, inter_elem,
-                 motif_types=("tetalt", "octalt"),
+                 motif_types=("tet", "oct"),
                  op_threshs=(0.3, 0.5),
                  dl=0.2, doverlap=1.0, facmaxdl=1.01, verbose=False):
         """
@@ -1731,18 +1846,18 @@ class StructureMotifInterstitial(Defect):
                                         allsites, len(allsites)-1,
                                         indeces_neighs=indeces_neighs)
                             motif_type = "unrecognized"
-                            if "tetalt" in motif_types:
+                            if "tet" in motif_types:
                                 if nneighs == 4 and \
-                                        opvals[motif_types.index("tetalt")] > \
-                                        op_threshs[motif_types.index("tetalt")]:
+                                        opvals[motif_types.index("tet")] > \
+                                        op_threshs[motif_types.index("tet")]:
                                     motif_type = "tet"
-                                    this_op = opvals[motif_types.index("tetalt")]
-                            if "octalt" in motif_types:
+                                    this_op = opvals[motif_types.index("tet")]
+                            if "oct" in motif_types:
                                 if nneighs == 6 and \
-                                        opvals[motif_types.index("octalt")] > \
-                                        op_threshs[motif_types.index("octalt")]:
+                                        opvals[motif_types.index("oct")] > \
+                                        op_threshs[motif_types.index("oct")]:
                                     motif_type = "oct"
-                                    this_op = opvals[motif_types.index("octalt")]
+                                    this_op = opvals[motif_types.index("oct")]
 
                             if motif_type != "unrecognized":
                                 cns = {}

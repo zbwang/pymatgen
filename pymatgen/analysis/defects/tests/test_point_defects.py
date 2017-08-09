@@ -574,9 +574,42 @@ class StructureMotifInterstitialTest(PymatgenTest):
                 validate_proximity=False, to_unit_cell=False,
                 coords_are_cartesian=False, site_properties=None)
         self.smi = StructureMotifInterstitial(self.silicon, "Si",
-                motif_types=["tetalt", "octalt"],
+                motif_types=["tet", "oct"],
                 op_threshs=[0.3, 0.5],
                 dl=0.4, doverlap=1.0, facmaxdl=1.01)
+        self.diamond = Structure(
+            Lattice([[2.189, 0, 1.264], [0.73, 2.064, 1.264],
+                     [0, 0, 2.528]]), ["C0+", "C0+"], [[2.554, 1.806, 4.423],
+                                                       [0.365, 0.258, 0.632]],
+            validate_proximity=False,
+            to_unit_cell=False, coords_are_cartesian=True,
+            site_properties=None)
+        self.nacl = Structure(
+            Lattice([[3.485, 0, 2.012], [1.162, 3.286, 2.012],
+                     [0, 0, 4.025]]), ["Na1+", "Cl1-"], [[0, 0, 0],
+                                                         [2.324, 1.643, 4.025]],
+            validate_proximity=False,
+            to_unit_cell=False, coords_are_cartesian=True,
+            site_properties=None)
+        self.cscl = Structure(
+            Lattice([[4.209, 0, 0], [0, 4.209, 0], [0, 0, 4.209]]),
+            ["Cl1-", "Cs1+"], [[2.105, 2.105, 2.105], [0, 0, 0]],
+            validate_proximity=False, to_unit_cell=False,
+            coords_are_cartesian=True, site_properties=None)
+        self.square_pyramid = Structure(
+            Lattice([[100, 0, 0], [0, 100, 0], [0, 0, 100]]),
+            ["C", "C", "C", "C", "C", "C"], [
+            [0, 0, 0], [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], \
+            [0, 0, 1]], validate_proximity=False, to_unit_cell=False,
+            coords_are_cartesian=True, site_properties=None)
+        self.trigonal_bipyramid = Structure(
+            Lattice([[100, 0, 0], [0, 100, 0], [0, 0, 100]]),
+            ["P", "Cl", "Cl", "Cl", "Cl", "Cl"], [
+            [0, 0, 0], [0, 0, 2.14], [0, 2.02, 0], [1.74937, -1.01, 0], \
+            [-1.74937, -1.01, 0], [0, 0, -2.14]], validate_proximity=False,
+            to_unit_cell=False, coords_are_cartesian=True,
+            site_properties=None)
+
 
     def test_all(self):
         self.assertIsInstance(self.smi, StructureMotifInterstitial)
@@ -596,9 +629,42 @@ class StructureMotifInterstitialTest(PymatgenTest):
         self.assertEqual(len(structs), 2)
         self.assertIsInstance(structs[0], Structure)
 
+    def test_get_neighbors_of_site_with_index(self):
+        self.assertAlmostEqual(len(get_neighbors_of_site_with_index(
+            self.diamond, 0)), 4)
+        self.assertAlmostEqual(len(get_neighbors_of_site_with_index(
+            self.nacl, 0)), 6)
+        self.assertAlmostEqual(len(get_neighbors_of_site_with_index(
+            self.cscl, 0)), 8)
+
+    def test_site_is_of_motif_type(self):
+        for i in range(self.diamond.num_sites):
+            self.assertEqual(site_is_of_motif_type(
+                    self.diamond, i), "tetrahedral")
+        for i in range(self.nacl.num_sites):
+            self.assertEqual(site_is_of_motif_type(
+                    self.nacl, i), "octahedral")
+        for i in range(self.cscl.num_sites):
+            self.assertEqual(site_is_of_motif_type(
+                    self.cscl, i), "bcc")
+        self.assertEqual(site_is_of_motif_type(
+                self.square_pyramid, 0), "square pyramidal")
+        for i in range(1, self.square_pyramid.num_sites):
+            self.assertEqual(site_is_of_motif_type(
+                    self.square_pyramid, i), "unrecognized")
+        self.assertEqual(site_is_of_motif_type(
+                self.trigonal_bipyramid, 0), "trigonal bipyramidal")
+        for i in range(1, self.trigonal_bipyramid.num_sites):
+            self.assertEqual(site_is_of_motif_type(
+                    self.trigonal_bipyramid, i), "unrecognized")
+
+
     def tearDown(self):
         del self.smi
         del self.silicon
+        del self.diamond
+        del self.nacl
+        del self.cscl
 
 
 if __name__ == "__main__":
