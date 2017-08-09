@@ -4,6 +4,7 @@ from math import exp
 from monty.json import MSONable
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from random import random
+from six.moves import xrange
 
 import logging
 import numpy as np

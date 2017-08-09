@@ -1,4 +1,4 @@
-from __future__ import division
+from __future__ import division, print_function
 
 import os
 import warnings
@@ -349,7 +349,7 @@ class EciGenerator(object):
         from cvxopt import solvers
         solvers.options['show_progress'] = False
 
-        structure_index_at_hull = list(np.argwhere(self._e_above_hull_input < 1e-5)[0])
+        structure_index_at_hull = list(np.argwhere(self.e_above_hull_input < 1e-5)[0])
 
         logging.info("removing duplicated correlation entries")
         corr_in = np.array(A)
@@ -426,7 +426,7 @@ class EciGenerator(object):
                     decomposition_now = pda.get_decomposition(ele_comp_now)
 
                     new_vector = -corr_in[i]
-                    for decompo_keys, decompo_values in decomposition_now.iteritems():
+                    for decompo_keys, decompo_values in decomposition_now.items():
                         reduced_decompo_keys = decompo_keys.composition.reduced_composition
                         index_1 = reduce_composition_at_hull.index(reduced_decompo_keys)
                         vertex_index_global = structure_index_at_hull[index_1]
@@ -477,7 +477,7 @@ class EciGenerator(object):
                 new_vector = corr_in[i]
 
                 abandon = False
-                for decompo_keys, decompo_values in decomposition_now.iteritems():
+                for decompo_keys, decompo_values in decomposition_now.items():
                     # print ("decompo_keys is", decompo_keys)
                     # print ("decompo_values is", decompo_values)
                     reduced_decompo_keys = decompo_keys.composition.reduced_composition
@@ -526,13 +526,13 @@ class EciGenerator(object):
         corr[0] = 1 #zero point cluster
         cluster_std = np.std(self.feature_matrix, axis=0)
         for sc in self.ce.symmetrized_clusters:
-            print sc, len(sc.bits)-1, sc.sc_b_id
-            print 'bit    eci    cluster_std    eci*cluster_std'
+            print(sc, len(sc.bits)-1, sc.sc_b_id)
+            print('bit    eci    cluster_std    eci*cluster_std')
             for i, bits in enumerate(sc.bit_combos):
                 eci = self.ecis[sc.sc_b_id + i]
                 c_std = cluster_std[sc.sc_b_id + i]
-                print bits, eci, c_std, eci * c_std
-        print self.ecis
+                print(bits, eci, c_std, eci * c_std)
+        print(self.ecis)
 
     def structure_energy(self, structure):
         return self.ce.structure_energy(structure, self.ecis)

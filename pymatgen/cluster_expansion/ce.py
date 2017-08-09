@@ -36,7 +36,7 @@ def get_bits(structure):
         if site.species_and_occu.num_atoms < 0.99:
             bits.append(s_bits.index('Vacancy'))
         all_bits.append(np.array(bits))
-    return all_bits, map(str, s_bits)
+    return all_bits, list(map(str, s_bits))
 
 
 
@@ -85,13 +85,10 @@ class Cluster(MSONable):
 
     def __str__(self):
         points = str(np.round(self.sites,2)).replace("\n", " ").ljust(len(self.sites) * 21)
-        return "Cluster: id: {:<3} Radius: {:<4.3} Points: {} Centroid: {}".format(self.c_id, 
-                                                                                   self.max_radius, 
-                                                                                   points, 
-                                                                                   np.round(self.centroid,2))
+        return "Cluster: id: {:<3} Radius: {:<4.3} Points: {} Centroid: " \
+            "{}".format(str(self.c_id), str(self.max_radius), points, str(np.round(self.centroid, 2)))
 
-    def __repr__(self):
-        return self.__str__()
+    __repr__ = __str__
 
     @staticmethod
     def from_sites(sites):
@@ -228,10 +225,10 @@ class SymmetrizedCluster(MSONable):
 
     def __str__(self):
         return "SymmetrizedCluster: id: {:<4} bit_id: {:<4} multiplicity: {:<4} symops: {:<4}" \
-            " {}".format(self.sc_id, self.sc_b_id, self.multiplicity, len(self.cluster_symops), self.base_cluster)
+            " {}".format(str(self.sc_id), str(self.sc_b_id), self.multiplicity,
+                         len(self.cluster_symops), str(self.base_cluster))
 
-    def __repr__(self):
-        return self.__str__()
+    __repr__ = __str__
 
 
 class ClusterExpansion(object):
@@ -361,7 +358,7 @@ class ClusterExpansion(object):
         all_neighbors = expansion_structure.lattice.get_points_in_sphere(expansion_structure.frac_coords, [0.5, 0.5, 0.5],
                                     max(radii.values()) + sum(expansion_structure.lattice.abc)/2)
 
-        for size, radius in sorted(radii.iteritems()):
+        for size, radius in sorted(radii.items()):
             new_clusters = []
             for c in clusters[size-1]:
                 if c.max_radius > radius:
@@ -428,7 +425,7 @@ class ClusterExpansion(object):
 
     def __str__(self):
         s = "ClusterBasis: {}\n".format(self.structure.composition)
-        for k, v in self.clusters.iteritems():
+        for k, v in self.clusters.items():
             s += "    size: {}\n".format(k)
             for z in v:
                 s += "    {}\n".format(z)

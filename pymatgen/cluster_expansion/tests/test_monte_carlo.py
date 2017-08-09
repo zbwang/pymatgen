@@ -49,9 +49,9 @@ class MonteCarloTest(unittest.TestCase):
 
         # failing these should be ~10 sigma event
         mcr = MonteCarloRunner(occu, cs, ecis, flip_function)
-        mcr.run_mc(20000, 500, 500, 5000)
+        mcr.run_mc(n_iterations=20000, start_t=500, end_t=500, n_samples=5000)
         self.assertAlmostEqual(enthalpy(500), np.mean(mcr.energies), places=2)
 
         mcr = MonteCarloRunner(occu, cs, ecis, flip_function)
-        mcr.run_mc(20000, 3000, 3000, 5000)
+        mcr.run_mc(n_iterations=20000, start_t=3000, end_t=3000, n_samples=5000)
         self.assertAlmostEqual(enthalpy(3000), np.mean(mcr.energies), places=2)
