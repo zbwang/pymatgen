@@ -2,7 +2,7 @@ from __future__ import division
 import unittest
 
 from pymatgen import Lattice, Structure
-from pymatgen.cluster_expansion.monte_carlo import MonteCarloRunner
+from pymatgen.cluster_expansion.monte_carlo import MonteCarloRunner, make_canonical_flip_function
 from pymatgen.cluster_expansion.ce import ClusterExpansion
 from pymatgen.transformations.advanced_transformations import OrderDisorderedStructureTransformation
 
@@ -48,7 +48,7 @@ class MonteCarloTest(unittest.TestCase):
             return [(i, occu[j]), (j, occu[i])]
 
         # failing these should be ~10 sigma event
-        mcr = MonteCarloRunner(occu, cs, ecis, flip_function)
+        mcr = MonteCarloRunner(occu, cs, ecis, make_canonical_flip_function(cs))
         mcr.run_mc(n_iterations=20000, start_t=500, end_t=500, n_samples=5000)
         self.assertAlmostEqual(enthalpy(500), np.mean(mcr.energies), places=2)
 

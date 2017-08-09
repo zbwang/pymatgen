@@ -1,9 +1,10 @@
 from __future__ import division
 
+from collections import defaultdict
 from math import exp
 from monty.json import MSONable
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
-from random import random
+from random import random, sample
 from six.moves import xrange
 
 import logging
@@ -162,3 +163,24 @@ class MCData(MSONable):
         max_len = min(n_samples, len(e))
         return MCData(t[::skip][:max_len], e[::skip][:max_len],
                       S[::skip][:max_len], G[::skip][:max_len])
+
+
+def make_canonical_flip_function(cluster_supercell):
+    """
+    Helper method to make a canonical flip function from a cluster supercell.
+    Depending on the particular sublattices of a given structure and species
+    overlap between them, a custom flip function can be more efficient.
+    """
+    bits = list(map(set, cluster_supercell.bits))
+    flippable = np.array([i for i, b in enumerate(bits) if len(b) > 1])
+
+    def flip_function(occu):
+        for _ in xrange(10000000):
+            i, j = sample(flippable, 2)
+            i_sp = occu[i]
+            j_sp = occu[j]
+            if i_sp != j_sp and i_sp in bits[j] and j_sp in bits[i]:
+                return [(i, j_sp), (j, i_sp)]
+        raise ValueError("Couldn't find valid flip")
+
+    return flip_function
