@@ -76,7 +76,7 @@ class EciGenerator(object):
             structures: list of Structure objects
             energies: list of total (non-normalized) energies
             weights: list of weights for the optimization.
-            mu: mu to use in the split_bregman, otherwise optimal value is calculated
+            mu: mu to use in the regularization, otherwise optimal value is calculated
                 by CV optimization
             max_dielectric: constrain the dielectric constant to be positive and below the
                 supplied value (note that this is also affected by whether the primitive
@@ -286,7 +286,7 @@ class EciGenerator(object):
     def _calc_cv_score(self, mu, A, f, weights, k=5):
         """
         Args:
-            mu: weight of error in bregman
+            mu: weight of error in L1 regularization
             A: sensing matrix (scaled appropriately)
             f: data to fit (scaled appropriately)
             k: number of partitions
@@ -317,8 +317,7 @@ class EciGenerator(object):
 
     def _fit(self, A, f, weights, mu):
         """
-        Returns the A matrix and f vector for the bregman
-        iterations, given weighting parameters
+        Returns the A matrix and f vector, given weighting parameters
         """
         A_in = A.copy()
         f_in = f.copy()

@@ -28,19 +28,11 @@ class EciGeneratorTest(unittest.TestCase):
 
         ce = ClusterExpansion.from_radii(self.structure, {2: 2}, use_ewald=False)
 
-        # currently there's a factor of 2 difference between the mu's in cvxopt and bregman implementations
-        # maybe should fix this
-
-        #eg = EciGenerator.unweighted(ce, structures=structures, energies=energies, mu=100, solver='bregman_l1')
-        #bregman_fit = np.dot(eg.feature_matrix, eg.ecis)
-        #self.assertTrue(np.allclose(eg.ecis, [-16.25708172, -0.29365225, 0.51789381], atol=1e-5))
-
         eg = EciGenerator.unweighted(ce, structures=structures, energies=energies, mu=50, solver='cvxopt_l1')
         cvxopt_fit = np.dot(eg.feature_matrix, eg.ecis)
         result = np.array([-16.40391361, -15.7391764, -16.07154501, -16.40391361, -16.40391361, -16.07154501])
         self.assertTrue(np.allclose(result, cvxopt_fit, atol=1e-5))
 
-        # bregman with mu 100, temperature 2000
         eg = EciGenerator.weight_by_e_above_hull(ce, structures=structures, temperature=2000,
                                                  energies=energies, mu=100, solver='cvxopt_l1')
         self.assertTrue(np.allclose(eg.ecis, [-17.08007087, -1.70603985, 0.53173669], atol=1e-5))

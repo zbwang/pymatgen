@@ -18,13 +18,13 @@ class MonteCarloTest(unittest.TestCase):
                   (0.5, 0.5, 0.5),  (0, 0, 0))
         self.structure = Structure(self.lattice, species, coords)
         self.structure.make_supercell([[2, 1, 1]])
+        self.ce = ClusterExpansion.from_radii(self.structure, {2: 2}, use_ewald=False)
         
     def test_monte_carlo_single_site(self):
-        ce = ClusterExpansion.from_radii(self.structure, {2: 2}, use_ewald=False)
         ecis = np.array([-1, 0.1, 0.2])
         energies = []
         for x in OrderDisorderedStructureTransformation().apply_transformation(self.structure, 1000):
-            energies.append(ce.structure_energy(x['structure'], ecis))
+            energies.append(self.ce.structure_energy(x['structure'], ecis))
 
         energies = np.array(energies)
         self.assertEqual(len(energies), 15)  # 6 choose 3
@@ -36,10 +36,10 @@ class MonteCarloTest(unittest.TestCase):
             return np.sum(energies * probabilities)
 
         s = OrderDisorderedStructureTransformation().apply_transformation(self.structure)
-        cs = ce.supercell_from_structure(s)
+        cs = self.ce.supercell_from_structure(s)
         occu = cs.occu_from_structure(s)
 
-        indices = np.array([i for i, b in enumerate(cs.bits) if b == ['Li+', 'Vacancy']])
+        indices = np.array([i for i, b in enumerate(cs.bits) if np.all(b == cs.bits[0])])
 
         def flip_function(occu):
             i = random.choice(indices)
