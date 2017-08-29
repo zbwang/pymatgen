@@ -1,16 +1,20 @@
 from __future__ import division
 import unittest
 
+from nose.exc import SkipTest
 from pymatgen import Lattice, Structure
 from pymatgen.cluster_expansion.eci_fit import EciGenerator
 from pymatgen.cluster_expansion.ce import ClusterExpansion
 from pymatgen.transformations.advanced_transformations import EnumerateStructureTransformation
+import pymatgen.optimization.l1regls as l1regls
 
 import numpy as np
 
 class EciGeneratorTest(unittest.TestCase):
     
     def setUp(self):
+        if not l1regls.cvxopt_loaded:
+            raise SkipTest("cvxopt not present. Skipping...")
         self.lattice = Lattice([[3, 3, 0],[0, 3, 3],[3, 0, 3]])
         species = [{'Li+': 0.3333333}] * 3 + ['Br-']
         coords = ((0.25, 0.25, 0.25), (0.75, 0.75, 0.75), 

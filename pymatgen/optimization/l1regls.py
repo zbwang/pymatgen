@@ -1,5 +1,10 @@
-from cvxopt import matrix, spdiag, mul, div, sqrt
-from cvxopt import blas, lapack, solvers
+try:
+    from cvxopt import matrix, spdiag, mul, div, sqrt
+    from cvxopt import blas, lapack, solvers
+    cvxopt_loaded = True
+except ImportError:
+    cvxopt_loaded = False
+
 import math
 import numpy as np
 
