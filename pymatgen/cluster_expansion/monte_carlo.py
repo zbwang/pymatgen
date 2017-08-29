@@ -172,7 +172,7 @@ def make_canonical_flip_function(cluster_supercell):
     overlap between them, a custom flip function can be more efficient.
     """
     bits = list(map(set, cluster_supercell.bits))
-    flippable = np.array([i for i, b in enumerate(bits) if len(b) > 1])
+    flippable = [i for i, b in enumerate(bits) if len(b) > 1]
 
     def flip_function(occu):
         for _ in xrange(10000000):
