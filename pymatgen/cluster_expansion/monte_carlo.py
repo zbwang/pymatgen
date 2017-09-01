@@ -61,6 +61,8 @@ class MonteCarloRunner:
             ending temperature
             n_samples: number of samples to store from these steps.
                 Total number from all calls to run_mc should be ~100,000
+                Values stored are moving averages over approximately
+                  n_iterations/n_samples periods
         """
         sample_frequency = n_iterations // n_samples
         log_t = np.log(start_t)
