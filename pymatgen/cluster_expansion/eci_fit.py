@@ -7,9 +7,7 @@ from itertools import chain
 
 from pymatgen import Composition, Structure
 from pymatgen.optimization.l1regls import l1regls
-from pymatgen.phasediagram.maker import PhaseDiagram
-from pymatgen.phasediagram.analyzer import PDAnalyzer
-from pymatgen.phasediagram.entries import PDEntry
+from pymatgen.analysis.phase_diagram import PhaseDiagram, PDEntry
 from pymatgen.cluster_expansion.ce import ClusterExpansion
 
 from matplotlib import pylab as plt
@@ -48,9 +46,8 @@ def _energies_above_composition(structures, energies):
 
 def _energies_above_hull(pd, structures, energies):
     e_above_hull = []
-    pda = PDAnalyzer(pd)
     for s, e in zip(structures, energies):
-        e_above_hull.append(pda.get_e_above_hull(PDEntry(s.composition.element_composition, e)))
+        e_above_hull.append(pd.get_e_above_hull(PDEntry(s.composition.element_composition, e)))
     return np.array(e_above_hull)
 
 
@@ -395,8 +392,6 @@ class EciGenerator(object):
         G_3 = np.concatenate((G_1, G_2), axis=0)
         h_3 = np.zeros((2 * N_corr, 1))
 
-        pda = PDAnalyzer(self.pd_input)
-
         for i in range(len(corr_in)):
             # print (i,self.concentrations[i])
 
@@ -422,7 +417,7 @@ class EciGenerator(object):
                 else:  # out of hull composition
 
                     ele_comp_now = self.structures[i].composition.reduced_composition.element_composition
-                    decomposition_now = pda.get_decomposition(ele_comp_now)
+                    decomposition_now = self.pd_input.get_decomposition(ele_comp_now)
 
                     new_vector = -corr_in[i]
                     for decompo_keys, decompo_values in decomposition_now.items():
@@ -462,7 +457,6 @@ class EciGenerator(object):
                                                max(self.normalized_energies) + 1000))
 
                 pd_new = PhaseDiagram(entries_new)
-                pda_new = PDAnalyzer(pd_new)
                 # print ("pd_new is")
                 # print pd_new
                 vertices_list_new_pd = list(set(chain.from_iterable(pd_new.facets)))
@@ -471,7 +465,7 @@ class EciGenerator(object):
                                                         for i in vertices_list_new_pd]
                 # print ("vertices_red_composition_list_new_pd is",vertices_red_composition_list_new_pd)
 
-                decomposition_now = pda_new.get_decomposition(ele_comp_now)
+                decomposition_now = pd_new.get_decomposition(ele_comp_now)
 
                 new_vector = corr_in[i]
 
