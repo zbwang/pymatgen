@@ -7,6 +7,7 @@ from __future__ import division, unicode_literals
 import unittest
 import os
 import warnings
+import random
 from pymatgen import SETTINGS
 from pymatgen.ext.matproj import MPRester, MPRestError
 from pymatgen.core.periodic_table import Element
@@ -48,7 +49,13 @@ class MPResterTest(unittest.TestCase):
 
     def tearDown(self):
         warnings.resetwarnings()
-        
+
+    def test_get_all_materials_ids_doc(self):
+        mids = self.rester.get_materials_ids("Al2O3")
+        random.shuffle(mids)
+        doc = self.rester.get_doc(mids.pop(0))
+        self.assertEqual(doc["pretty_formula"], "Al2O3")
+
     def test_get_data(self):
         props = ["energy", "energy_per_atom", "formation_energy_per_atom",
                  "nsites", "unit_cell_formula", "pretty_formula", "is_hubbard",
@@ -303,6 +310,10 @@ class MPResterTest(unittest.TestCase):
         kinks_open_O = self.rester.get_interface_reactions(
             "LiCoO2", "Li3PS4", open_el="O", relative_mu=-1)
         self.assertTrue(len(kinks_open_O) > 0)
+        with warnings.catch_warnings(record=True) as w:
+            warnings.filterwarnings("always", message="The reactant.+")
+            self.rester.get_interface_reactions("LiCoO2", "MnO3")
+            self.assertTrue("The reactant" in str(w[-1].message))
 
     def test_parse_criteria(self):
         crit = MPRester.parse_criteria("mp-1234 Li-*")
