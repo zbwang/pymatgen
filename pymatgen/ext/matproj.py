@@ -329,9 +329,9 @@ class MPRester(object):
                 calculations for more accurate phase diagrams and reaction
                 energies.
             inc_structure (str): If None, entries returned are
-                ComputedEntries. If inc_structure="final",
-                ComputedStructureEntries with final structures are returned.
-                Otherwise, ComputedStructureEntries with initial structures
+                ComputedEntries. If inc_structure="initial",
+                ComputedStructureEntries with initial structures are returned.
+                Otherwise, ComputedStructureEntries with final structures
                 are returned.
             property_data (list): Specify additional properties to include in
                 entry.data. If None, no data. Should be a subset of
@@ -350,10 +350,10 @@ class MPRester(object):
         if property_data:
             props += property_data
         if inc_structure:
-            if inc_structure == "final":
-                props.append("structure")
-            else:
+            if inc_structure == "initial":
                 props.append("initial_structure")
+            else:
+                props.append("structure")
 
         if not isinstance(chemsys_formula_id_criteria, dict):
             criteria = MPRester.parse_criteria(chemsys_formula_id_criteria)
@@ -379,8 +379,8 @@ class MPRester(object):
                                   entry_id=d["task_id"])
 
             else:
-                prim = d["structure"] if inc_structure == "final" else d[
-                    "initial_structure"]
+                prim = d["initial_structure"] if inc_structure == "initial"\
+                    else d["structure"]
                 if conventional_unit_cell:
                     s = SpacegroupAnalyzer(prim).get_conventional_standard_structure()
                     energy = d["energy"]*(len(s)/len(prim))
@@ -543,18 +543,21 @@ class MPRester(object):
         data = self.get_data(material_id, prop="dos")
         return data[0]["dos"]
 
-    def get_bandstructure_by_material_id(self, material_id):
+    def get_bandstructure_by_material_id(self, material_id, line_mode=True):
         """
         Get a BandStructure corresponding to a material_id.
 
         Args:
             material_id (str): Materials Project material_id (an int).
+            line_mode (bool): If True, fetch a BandStructureSymmLine object
+                (default). If False, return the uniform band structure.
 
         Returns:
             A BandStructure object.
         """
-        data = self.get_data(material_id, prop="bandstructure")
-        return data[0]["bandstructure"]
+        prop = "bandstructure" if line_mode else "bandstructure_uniform"
+        data = self.get_data(material_id, prop=prop)
+        return data[0][prop]
 
     def get_entries_in_chemsys(self, elements, compatible_only=True,
                                inc_structure=None, property_data=None,
