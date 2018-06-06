@@ -8,15 +8,17 @@ import numpy as np
 import unittest
 import os
 
+from monty.os.path import which
+
 from pymatgen.analysis.local_env import ValenceIonicRadiusEvaluator, \
     VoronoiNN, VoronoiNN_modified, JMolNN, \
     MinimumDistanceNN, MinimumOKeeffeNN, MinimumVIRENN, \
     get_neighbors_of_site_with_index, site_is_of_motif_type, \
     NearNeighbors, LocalStructOrderParams, BrunnerNN_reciprocal, \
-    BrunnerNN_real, BrunnerNN_relative, EconNN, CrystalNN
+    BrunnerNN_real, BrunnerNN_relative, EconNN, CrystalNN, CutOffDictNN, \
+    Critic2NN
 from pymatgen import Element, Structure, Lattice
 from pymatgen.util.testing import PymatgenTest
-from pymatgen.io.cif import CifParser
 
 test_dir = os.path.join(os.path.dirname(__file__), "..", "..", "..",
                         'test_files')
@@ -255,6 +257,15 @@ class MiniDistNNTest(PymatgenTest):
         self.assertAlmostEqual(VoronoiNN_modified().get_cn(
             self.cscl, 0), 8)
 
+    def test_get_local_order_params(self):
+
+        nn = MinimumDistanceNN()
+        ops = nn.get_local_order_parameters(self.diamond, 0)
+        self.assertAlmostEqual(ops['tetrahedral'], 0.9999934389036574)
+
+        ops = nn.get_local_order_parameters(self.nacl, 0)
+        self.assertAlmostEqual(ops['octahedral'], 0.9999995266669)
+
     def tearDown(self):
         del self.diamond
         del self.nacl
@@ -378,9 +389,11 @@ class NearNeighborTest(PymatgenTest):
         # can't there are probably bigger problems
         subclasses = NearNeighbors.__subclasses__()
         for subclass in subclasses:
-            nn_info = subclass().get_nn_info(self.diamond, 0)
-            self.assertEqual(nn_info[0]['site_index'], 1)
-            self.assertEqual(nn_info[0]['image'][0], 1)
+            # Critic2NN has external dependency, is tested separately
+            if 'Critic2' not in str(subclass):
+                nn_info = subclass().get_nn_info(self.diamond, 0)
+                self.assertEqual(nn_info[0]['site_index'], 1)
+                self.assertEqual(nn_info[0]['image'][0], 1)
 
     def tearDown(self):
         del self.diamond
@@ -576,6 +589,12 @@ class LocalStructOrderParamsTest(PymatgenTest):
     def test_init(self):
         self.assertIsNotNone(
             LocalStructOrderParams(["cn"], parameters=None, cutoff=0.99))
+
+        parameters = [{'norm': 2}]
+        lostops = LocalStructOrderParams(["cn"], parameters=parameters)
+        tmp = lostops.get_parameters(0)
+        parameters[0]['norm'] = 3
+        self.assertEqual(tmp, lostops.get_parameters(0))
 
     def test_get_order_parameters(self):
         # Set up everything.
@@ -800,6 +819,8 @@ class CrystalNNTest(PymatgenTest):
     def setUp(self):
         self.lifepo4 = self.get_structure('LiFePO4')
         self.lifepo4.add_oxidation_state_by_guess()
+        self.he_bcc = self.get_structure('He_BCC')
+        self.he_bcc.add_oxidation_state_by_guess()
 
     def test_sanity(self):
         with self.assertRaises(ValueError):
@@ -823,11 +844,12 @@ class CrystalNNTest(PymatgenTest):
     def test_weighted_cn(self):
         cnn = CrystalNN(weighted_cn=True)
         cn_array = []
-        expected_array = [6.0194, 6.0176, 6.0194, 6.0176, 5.5919, 5.5909,
-                          5.5914, 5.5914, 3.9504, 3.9504, 3.9504, 3.9504,
-                          3.7935, 3.5778, 3.5731, 3.6358, 3.6358, 3.5731,
-                          3.5778, 3.7935, 3.7935, 3.5778, 3.5721, 3.6368,
-                          3.6368, 3.5721, 3.5778, 3.7935]
+
+        expected_array = [5.8962, 5.8996, 5.8962, 5.8996, 5.7195, 5.7195,
+                          5.7202, 5.7194, 4.0012, 4.0012, 4.0012, 4.0009,
+                          3.3897, 3.2589, 3.1218, 3.1914, 3.1914, 3.1218,
+                          3.2589, 3.3897, 3.3897, 3.2589, 3.1207, 3.1924,
+                          3.1915, 3.1207, 3.2598, 3.3897]
         for idx, _ in enumerate(self.lifepo4):
             cn_array.append(cnn.get_cn(self.lifepo4, idx, use_weights=True))
 
@@ -842,12 +864,54 @@ class CrystalNNTest(PymatgenTest):
     def test_cation_anion(self):
         cnn = CrystalNN(weighted_cn=True, cation_anion=True)
         self.assertAlmostEqual(cnn.get_cn(self.lifepo4, 0, use_weights=True),
-                               5.93283, 2)
+                               5.8630, 2)
 
     def test_x_diff_weight(self):
         cnn = CrystalNN(weighted_cn=True, x_diff_weight=0)
         self.assertAlmostEqual(cnn.get_cn(self.lifepo4, 0, use_weights=True),
-                               6.072855, 2)
+                               5.9522, 2)
+
+    def test_noble_gas_material(self):
+        cnn = CrystalNN()
+
+        self.assertEqual(cnn.get_cn(self.he_bcc, 0, use_weights=False), 0)
+
+        cnn = CrystalNN(distance_cutoffs=(1.25, 5))
+        self.assertEqual(cnn.get_cn(self.he_bcc, 0, use_weights=False), 8)
+
+
+class CutOffDictNNTest(PymatgenTest):
+
+    def setUp(self):
+        self.diamond = Structure(
+            Lattice([[2.189, 0, 1.264], [0.73, 2.064, 1.264], [0, 0, 2.528]]),
+            ["C", "C"], [[2.554, 1.806, 4.423], [0.365, 0.258, 0.632]],
+            coords_are_cartesian=True
+        )
+
+    def test_cn(self):
+
+        nn = CutOffDictNN({('C', 'C'): 2})
+        self.assertEqual(nn.get_cn(self.diamond, 0), 4)
+
+        nn_null = CutOffDictNN()
+        self.assertEqual(nn_null.get_cn(self.diamond, 0), 0)
+
+
+@unittest.skipIf(not which('critic2'), "critic2 executable not present")
+class Critic2NNTest(PymatgenTest):
+
+    def setUp(self):
+        self.diamond = Structure(
+            Lattice([[2.189, 0, 1.264], [0.73, 2.064, 1.264], [0, 0, 2.528]]),
+            ["C", "C"], [[2.554, 1.806, 4.423], [0.365, 0.258, 0.632]],
+            coords_are_cartesian=True
+        )
+
+    def test_cn(self):
+
+        nn = Critic2NN()
+        #self.assertEqual(nn.get_cn(self.diamond, 0), 4)
 
 
 if __name__ == '__main__':
